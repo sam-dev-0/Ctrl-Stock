@@ -1,3 +1,5 @@
+#include <limits.h>
+
 #include "str16.h"
 
 #ifdef _WIN32
@@ -472,4 +474,264 @@ char *str16_to_utf8_alloc(const char16_t *txt)
     utf8_out[j] = '\0';
 
     return utf8_out;
+}
+
+long int str16_forLong(const char16_t *string, char16_t **end, int base)
+{
+    const char16_t *str = string;
+    unsigned long acc = 0;
+    int sign = 1;
+    int overflow = 0;
+
+    while (*str == u' ' || *str == u'\t' || *str == u'\n' || *str == u'\r')
+        str++;
+
+    const char16_t *save = str;
+
+    if (*str == u'-')
+    {
+        sign = -1;
+        str++;
+    }
+    else if (*str == u'+')
+        str++;
+
+    if (base < 0 || base == 1 || base > 36)
+    {
+        if (end != NULL)
+            *end = (char16_t *)string;
+
+        return 0;
+    }
+
+    if (base == 0 || base == 16)
+    {
+        if (*str == u'0' && (*(str + 1) == u'x' || *(str + 1) == u'X'))
+        {
+            base = 16;
+            str += 2;
+        }
+    }
+    if (base == 0)
+    {
+        if (*str == u'0')
+            base = 8;
+
+        else
+            base = 10;
+    }
+
+    const char16_t *digits_start = str;
+
+    unsigned long cutoff = (sign > 0) ? LONG_MAX : (unsigned long)LONG_MAX + 1;
+    unsigned long cutlim = cutoff % base;
+    cutoff /= base;
+
+    while (*str)
+    {
+        int c = *str;
+        int val;
+
+        if (c >= u'0' && c <= u'9')
+            val = c - u'0';
+        else if (c >= u'a' && c <= u'z')
+            val = c - u'a' + 10;
+        else if (c >= u'A' && c <= u'Z')
+            val = c - u'A' + 10;
+        else
+            break;
+
+        if (val >= base)
+            break;
+
+        if (overflow || acc > cutoff || (acc == cutoff && (unsigned long)val > cutlim))
+            overflow = 1;
+
+        else
+            acc = (acc * base) + val;
+
+        str++;
+    }
+
+    if (end != NULL)
+        *end = (char16_t *)(str == digits_start ? string : str);
+
+    if (overflow)
+        return (sign > 0) ? LONG_MAX : LONG_MIN;
+
+    return (long)(sign > 0 ? acc : -acc);
+}
+
+double str16_forDouble(const char16_t *string, char16_t **end)
+{
+    const char16_t *str = string;
+    double acc = 0.0;
+    int sign = 1;
+
+    while (*str == u' ' || *str == u'\t' || *str == u'\n' || *str == u'\r')
+        str++;
+
+    if (*str == u'-')
+    {
+        sign = -1;
+        str++;
+    }
+    else if (*str == u'+')
+        str++;
+
+    if ((*str == u'I' || *str == u'i') && (*(str + 1) == u'N' || *(str + 1) == u'n') && (*(str + 2) == u'F' || *(str + 2) == u'f'))
+    {
+        str += 3;
+
+        if ((*str == u'I' || *str == u'i') && (*(str + 1) == u'N' || *(str + 1) == u'n') && (*(str + 4) == u'Y' || *(str + 4) == u'y'))
+            while ((*str >= u'a' && *str <= u'z') || (*str >= u'A' && *str <= u'Z'))
+                str++;
+
+        if (end != NULL)
+            *end = (char16_t *)str;
+
+        return sign > 0 ? (1e300 * 1e300) : -(1e300 * 1e300);
+    }
+
+    int has_digits = 0;
+
+    while (*str >= u'0' && *str <= u'9')
+    {
+        acc = (acc * 10.0) + (*str - u'0');
+        has_digits = 1;
+        str++;
+    }
+
+    if (*str == u'.' || *str == u',')
+    {
+        str++;
+        double power = 1.0;
+
+        while (*str >= u'0' && *str <= u'9')
+        {
+            acc = (acc * 10.0) + (*str - u'0');
+            power *= 10.0;
+            has_digits = 1;
+            str++;
+        }
+
+        acc /= power;
+    }
+
+    if (has_digits && (*str == u'e' || *str == u'E'))
+    {
+        const char16_t *save_e = str;
+        str++;
+
+        int exp_sign = 1;
+        if (*str == u'-')
+        {
+            exp_sign = -1;
+            str++;
+        }
+        else if (*str == u'+')
+            str++;
+
+        int exp_val = 0;
+        int has_exp_digits = 0;
+
+        while (*str >= u'0' && *str <= u'9')
+        {
+            if (exp_val < 10000)
+                exp_val = (exp_val * 10) + (*str - u'0');
+
+            has_exp_digits = 1;
+            str++;
+        }
+
+        if (has_exp_digits)
+        {
+            double exp_mult = 1.0;
+            double base_mult = 10.0;
+            int e = exp_val;
+
+            while (e > 0)
+            {
+                if (e % 2 == 1)
+                    exp_mult *= base_mult;
+
+                base_mult *= base_mult;
+                e /= 2;
+            }
+
+            if (exp_sign < 0)
+                acc /= exp_mult;
+
+            else
+                acc *= exp_mult;
+        }
+        else
+            str = save_e;
+    }
+
+    if (end != NULL)
+        *end = (char16_t *)(has_digits ? str : string);
+
+    return acc * sign;
+}
+
+int str16_fromLong(long value, char16_t *buffer, int base)
+{
+    if (base < 2 || base > 36)
+    {
+        buffer[0] = 0;
+        return 0;
+    }
+
+    size_t i = 0;
+    int isNegative = 0;
+    unsigned long n;
+
+    if (value < 0 && base == 10)
+    {
+        isNegative = 1;
+        n = (unsigned long)(-(value + 1)) + 1;
+    }
+    else
+        n = (unsigned long)value;
+
+    do
+    {
+        int rem = n % base;
+        buffer[i++] = (rem > 9) ? (char16_t)((rem - 10) + u'a') : (char16_t)(rem + u'0');
+        n = n / base;
+    } while (n != 0);
+
+    if (isNegative)
+        buffer[i++] = u'-';
+
+    buffer[i] = 0;
+    str16_reverse(buffer);
+
+    return i;
+}
+
+// Converte um double para string UTF-16.
+// 'precision' define o número de casas decimais (ex: 6).
+int str16_fromDouble(double value, int precision, char16_t *buffer, size_t max_len)
+{
+    if (!buffer || max_len == 0)
+        return 0;
+
+    char temp_ascii[64];
+
+    int len = snprintf(temp_ascii, sizeof(temp_ascii), "%.*f", precision, value);
+
+    if (len < 0)
+        return 0;
+
+    if ((size_t)len >= max_len)
+        len = max_len - 1;
+
+    for (int i = 0; i < len; i++)
+        buffer[i] = (char16_t)temp_ascii[i];
+
+    buffer[len] = 0;
+
+    return (size_t)len;
 }
