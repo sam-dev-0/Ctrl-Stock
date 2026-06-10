@@ -162,11 +162,11 @@ void str16_trimspaces_left(char16_t *string)
     string[j] = 0;
 }
 
-int str16_reverse(char16_t *string)
+char16_t *str16_reverse(char16_t *string)
 {
     size_t n = str16_length(string);
     if (n < 2)
-        return 0;
+        return NULL;
 
     for (size_t i = 0; i < n / 2; i++)
     {
@@ -175,7 +175,7 @@ int str16_reverse(char16_t *string)
         string[n - i - 1] = tmp;
     }
 
-    return 1;
+    return string;
 }
 
 void str16_split(const char16_t *string, char16_t **out, char16_t delim)
@@ -675,12 +675,12 @@ double str16_forDouble(const char16_t *string, char16_t **end)
     return acc * sign;
 }
 
-int str16_fromLong(long value, char16_t *buffer, int base)
+char16_t *str16_fromLong(long value, char16_t *buffer, int base)
 {
     if (base < 2 || base > 36)
     {
         buffer[0] = 0;
-        return 0;
+        return NULL;
     }
 
     size_t i = 0;
@@ -708,12 +708,10 @@ int str16_fromLong(long value, char16_t *buffer, int base)
     buffer[i] = 0;
     str16_reverse(buffer);
 
-    return i;
+    return buffer;
 }
 
-// Converte um double para string UTF-16.
-// 'precision' define o número de casas decimais (ex: 6).
-int str16_fromDouble(double value, int precision, char16_t *buffer, size_t max_len)
+char16_t *str16_fromDouble(double value, int precision, char16_t *buffer, size_t max_len)
 {
     if (!buffer || max_len == 0)
         return 0;
@@ -733,5 +731,5 @@ int str16_fromDouble(double value, int precision, char16_t *buffer, size_t max_l
 
     buffer[len] = 0;
 
-    return (size_t)len;
+    return buffer;
 }

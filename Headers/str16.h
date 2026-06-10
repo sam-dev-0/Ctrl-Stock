@@ -22,7 +22,7 @@ void str16_trimspaces_right(char16_t *string);
 
 void str16_trimspaces_left(char16_t *string);
 
-int str16_reverse(char16_t *string);
+char16_t *str16_reverse(char16_t *string);
 
 void str16_split(const char16_t *string, char16_t **out, char16_t delim);
 
@@ -46,8 +46,8 @@ long int str16_forLong(const char16_t *nptr, char16_t **endptr, int base);
 
 double str16_forDouble(const char16_t *string, char16_t **end);
 
-int str16_fromLong(long value, char16_t *buffer, int base);
+char16_t *str16_fromLong(long value, char16_t *buffer, int base);
 
-int str16_fromDouble(double value, int precision, char16_t *buffer, size_t max_len);
+char16_t *str16_fromDouble(double value, int precision, char16_t *buffer, size_t max_len);
 
 #endif
