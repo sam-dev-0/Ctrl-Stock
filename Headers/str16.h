@@ -42,7 +42,7 @@ int str16_scanline(char16_t *buffer, size_t max_len);
 
 char *str16_to_utf8_alloc(const char16_t *txt);
 
-long int str16_forLong(const char16_t *nptr, char16_t **endptr, int base);
+long int str16_forLong(const char16_t *string, char16_t **end, int base);
 
 double str16_forDouble(const char16_t *string, char16_t **end);
 
