@@ -1,46 +1,141 @@
-#include <limits.h>
-
 #include "str16.h"
+
+#include <limits.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef _WIN32
 #include <windows.h>
-#else
-#include <unistd.h>
 #endif
+
+static int str16_is_space(char16_t c)
+{
+    return c == u' ' || c == u'\t' || c == u'\n' || c == u'\r';
+}
+
+static int str16_is_surrogate(uint16_t c)
+{
+    return c >= 0xD800u && c <= 0xDFFFu;
+}
+
+static int str16_utf8_cont(unsigned char c)
+{
+    return (c & 0xC0u) == 0x80u;
+}
+
+static int str16_prefix_icase(const char16_t *str, const char *ascii)
+{
+    size_t i = 0;
+
+    if (!str || !ascii)
+        return 0;
+
+    while (ascii[i])
+    {
+        char16_t a = str[i];
+        char b = ascii[i];
+
+        if (a >= u'A' && a <= u'Z')
+            a = (char16_t)(a - u'A' + u'a');
+        if (b >= 'A' && b <= 'Z')
+            b = (char)(b - 'A' + 'a');
+
+        if (a != (char16_t)(unsigned char)b)
+            return 0;
+        i++;
+    }
+
+    return 1;
+}
 
 size_t str16_length(const char16_t *string)
 {
     size_t n = 0;
+
+    if (!string)
+        return 0;
+
     while (string[n])
         n++;
 
     return n;
 }
 
-char16_t* str16_copy(const char16_t *in, char16_t *out)
+char16_t *str16_copy(const char16_t *in, char16_t *out)
 {
     size_t n = 0;
-    while ((out[n] = in[n]))
+
+    if (!in || !out)
+        return NULL;
+
+    while ((out[n] = in[n]) != 0)
         n++;
 
     return out;
 }
 
-char16_t* str16_concat(const char16_t *strIN, char16_t *strOUT)
+int str16_copy_n(const char16_t *in, char16_t *out, size_t capacity)
 {
-    size_t out = str16_length(strOUT);
+    size_t len;
+
+    if (!in || !out || capacity == 0)
+        return 0;
+
+    len = str16_length(in);
+    if (len >= capacity)
+        return 0;
+
+    for (size_t i = 0; i <= len; i++)
+        out[i] = in[i];
+
+    return 1;
+}
+
+char16_t *str16_concat(const char16_t *in, char16_t *out)
+{
+    size_t used;
     size_t i = 0;
 
-    while ((strOUT[out + i] = strIN[i]))
+    if (!in || !out)
+        return NULL;
+
+    used = str16_length(out);
+    while ((out[used + i] = in[i]) != 0)
         i++;
 
-    return strOUT;
+    return out;
+}
+
+int str16_concat_n(const char16_t *in, char16_t *out, size_t capacity)
+{
+    size_t used;
+    size_t add;
+
+    if (!in || !out || capacity == 0)
+        return 0;
+
+    used = str16_length(out);
+    add = str16_length(in);
+
+    if (used >= capacity || add > capacity - used - 1)
+        return 0;
+
+    for (size_t i = 0; i <= add; i++)
+        out[used + i] = in[i];
+
+    return 1;
 }
 
 int str16_equal(const char16_t *str1, const char16_t *str2)
 {
     size_t n = 0;
-    while (str1[n] == str2[n]){
+
+    if (!str1 || !str2)
+        return str1 == str2;
+
+    while (str1[n] == str2[n])
+    {
         if (str1[n] == 0)
             return 1;
         n++;
@@ -51,92 +146,116 @@ int str16_equal(const char16_t *str1, const char16_t *str2)
 
 int str16_contains(const char16_t *string, const char16_t *sub)
 {
-    size_t str1 = str16_length(string);
-    size_t str2 = str16_length(sub);
+    size_t str1;
+    size_t str2;
+    size_t *lps;
+    size_t len = 0;
+    size_t i = 1;
+    size_t j = 0;
+
+    if (!string || !sub)
+        return 0;
+
+    str1 = str16_length(string);
+    str2 = str16_length(sub);
 
     if (str2 == 0)
         return 1;
     if (str2 > str1)
         return 0;
 
-    size_t *LPS = malloc(str2 * sizeof(size_t));
-    if (LPS == NULL)
+    lps = malloc(str2 * sizeof(*lps));
+    if (!lps)
         return 0;
 
-    LPS[0] = 0;
-    size_t len = 0;
-    size_t i = 1;
-
+    lps[0] = 0;
     while (i < str2)
     {
         if (sub[i] == sub[len])
         {
-            len++;
-            LPS[i] = len;
-            i++;
+            lps[i++] = ++len;
+        }
+        else if (len != 0)
+        {
+            len = lps[len - 1];
         }
         else
         {
-            if (len != 0)
-            {
-                len = LPS[len - 1];
-            }
-            else
-            {
-                LPS[i] = 0;
-                i++;
-            }
+            lps[i++] = 0;
         }
     }
 
     i = 0;
-    size_t j = 0;
-
     while ((str1 - i) >= (str2 - j))
     {
         if (sub[j] == string[i])
         {
-            j++;
             i++;
+            j++;
         }
 
         if (j == str2)
         {
-            free(LPS);
+            free(lps);
             return 1;
         }
-        else if (i < str1 && sub[j] != string[i])
+
+        if (i < str1 && sub[j] != string[i])
         {
             if (j != 0)
-                j = LPS[j - 1];
+                j = lps[j - 1];
             else
                 i++;
         }
     }
 
-    free(LPS);
+    free(lps);
     return 0;
 }
 
 int str16_fixsize(const char16_t *in, char16_t *out, size_t fixsize)
 {
-    size_t n = str16_length(in);
-    if (fixsize < 1)
-        return 0;
-    if (n > (fixsize - 1))
-        n = (fixsize - 1);
+    size_t n;
 
-    for (size_t i = 0; i < fixsize; i++)
-        out[i] = (i < n) ? in[i] : u' ';
+    if (!in || !out || fixsize == 0)
+        return 0;
+
+    n = str16_length(in);
+    if (n > fixsize - 1)
+        n = fixsize - 1;
+
+    for (size_t i = 0; i < fixsize - 1; i++)
+        out[i] = i < n ? in[i] : u' ';
 
     out[fixsize - 1] = 0;
+    return 1;
+}
+
+int str16_pack(const char16_t *in, char16_t *out, size_t width)
+{
+    size_t n;
+
+    if (!in || !out)
+        return 0;
+
+    n = str16_length(in);
+    if (n > width)
+        return 0;
+
+    for (size_t i = 0; i < width; i++)
+        out[i] = i < n ? in[i] : u' ';
 
     return 1;
 }
 
 void str16_trimspaces_right(char16_t *string)
 {
-    size_t n = str16_length(string);
+    size_t n;
+
+    if (!string)
+        return;
+
+    n = str16_length(string);
     while (n > 0 && string[n - 1] == u' ')
         n--;
 
@@ -145,29 +264,29 @@ void str16_trimspaces_right(char16_t *string)
 
 void str16_trimspaces_left(char16_t *string)
 {
-    size_t n = str16_length(string);
-
     size_t i = 0;
+    size_t j = 0;
+
+    if (!string)
+        return;
+
     while (string[i] == u' ')
         i++;
 
-    size_t j = 0;
     while (string[i])
-    {
-        string[j] = string[i];
-        i++;
-        j++;
-    }
-    
+        string[j++] = string[i++];
+
     string[j] = 0;
 }
 
 char16_t *str16_reverse(char16_t *string)
 {
-    size_t n = str16_length(string);
-    if (n < 2)
+    size_t n;
+
+    if (!string)
         return NULL;
 
+    n = str16_length(string);
     for (size_t i = 0; i < n / 2; i++)
     {
         char16_t tmp = string[i];
@@ -184,29 +303,32 @@ void str16_split(const char16_t *string, char16_t **out, char16_t delim)
     size_t j = 0;
     size_t k = 0;
 
+    if (!string || !out)
+        return;
+
     while (string[k])
     {
         if (string[k] == delim)
         {
-            out[j][i] = 0;
-            j++;
+            out[j++][i] = 0;
             k++;
             i = 0;
             continue;
         }
-        out[j][i] = string[k];
-        i++, k++;
+        out[j][i++] = string[k++];
     }
     out[j][i] = 0;
 }
 
 int str16_char_contains(char16_t c, const char16_t *string)
 {
+    if (!string)
+        return 0;
+
     while (*string)
     {
-        if (*string == c)
+        if (*string++ == c)
             return 1;
-        string++;
     }
 
     return 0;
@@ -217,17 +339,20 @@ char16_t *str16_tokens(char16_t *string, const char16_t *delim, char16_t **save)
     char16_t *start;
     char16_t *end;
 
-    if (string != NULL)
+    if (!delim || !save)
+        return NULL;
+
+    if (string)
         *save = string;
 
-    if (*save == 0 || **save == 0)
+    if (!*save || !**save)
         return NULL;
 
     start = *save;
     while (*start && str16_char_contains(*start, delim))
         start++;
 
-    if (*start == 0)
+    if (!*start)
     {
         *save = start;
         return NULL;
@@ -236,12 +361,14 @@ char16_t *str16_tokens(char16_t *string, const char16_t *delim, char16_t **save)
     end = start;
     while (*end && !str16_char_contains(*end, delim))
         end++;
-    
-    if(*end){
+
+    if (*end)
+    {
         *end = 0;
         *save = end + 1;
     }
-    else{
+    else
+    {
         *save = end;
     }
 
@@ -250,132 +377,114 @@ char16_t *str16_tokens(char16_t *string, const char16_t *delim, char16_t **save)
 
 int char16_write(FILE *stream, uint16_t c)
 {
-    unsigned char byte[sizeof(char16_t)] = {
-        (unsigned char)(c & 0xFFu),
-        (unsigned char)((c >> 8) & 0xFFu)};
+    unsigned char byte[2];
 
-    return fwrite(byte, 1, sizeof(char16_t), stream) == sizeof(char16_t) ? 1 : 0;
+    if (!stream)
+        return 0;
+
+    byte[0] = (unsigned char)(c & 0xFFu);
+    byte[1] = (unsigned char)((c >> 8) & 0xFFu);
+
+    return fwrite(byte, 1, sizeof(byte), stream) == sizeof(byte);
 }
 
 int char16_read(FILE *file, uint16_t *c)
 {
-    unsigned char byte[sizeof(char16_t)];
-    if (fread(byte, 1, sizeof(char16_t), file) != sizeof(char16_t))
+    unsigned char byte[2];
+
+    if (!file || !c)
         return 0;
 
-    *c = (uint16_t)byte[0] | ((uint16_t)byte[1] << 8);
+    if (fread(byte, 1, sizeof(byte), file) != sizeof(byte))
+        return 0;
 
+    *c = (uint16_t)((uint16_t)byte[0] | ((uint16_t)byte[1] << 8));
     return 1;
 }
 
-// int str16_print(const char16_t *txt)
-// {
-//     size_t n = str16_length(txt);
-//     if (n == 0)
-//         return 0;
-
-//     unsigned char *buffer = malloc(n * sizeof(char16_t));
-//     if (buffer == NULL)
-//         return 0;
-
-//     for (size_t i = 0; i < n; i++)
-//     {
-//         buffer[i * 2] = (unsigned char)(txt[i] & 0xFFu);
-//         buffer[i * 2 + 1] = (unsigned char)((txt[i] >> 8) & 0xFFu);
-//     }
-
-//     size_t written = fwrite(buffer, 1, n * sizeof(char16_t), stdout);
-//     free(buffer);
-
-//     if (written != n * sizeof(char16_t))
-//         return 0;
-
-//     return 1;
-// }
-
-int str16_print(const char16_t *txt)
+char *str16_to_utf8_alloc(const char16_t *txt)
 {
-    size_t n = str16_length(txt);
-    if (n == 0)
-        return 0;
-
-#ifdef _WIN32
-    /* Modo Windows: API Direta do Console */
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (GetFileType(hConsole) == FILE_TYPE_CHAR)
-    {
-        DWORD written;
-        return WriteConsoleW(hConsole, txt, (DWORD)n, &written, NULL) ? 1 : 0;
-    }
-
-    return 0;
-#else
-    /* Modo POSIX: Conversão Bitwise UTF-16 para UTF-8 On-The-Fly */
-    size_t utf8_max_len = (n * 3) + 1;
-    unsigned char *utf8_buf = malloc(utf8_max_len);
-    if (!utf8_buf)
-        return 0;
-
+    size_t len;
+    char *out;
     size_t j = 0;
-    for (size_t i = 0; i < n; i++)
+
+    if (!txt)
+        return NULL;
+
+    len = str16_length(txt);
+    out = malloc(len * 3 + 1);
+    if (!out)
+        return NULL;
+
+    for (size_t i = 0; i < len; i++)
     {
         uint16_t c = txt[i];
-        if (c < 0x0080)
+
+        if (str16_is_surrogate(c))
         {
-            utf8_buf[j++] = (unsigned char)c;
+            out[j++] = '?';
         }
-        else if (c < 0x0800)
+        else if (c < 0x0080u)
         {
-            utf8_buf[j++] = (unsigned char)(0xC0 | (c >> 6));
-            utf8_buf[j++] = (unsigned char)(0x80 | (c & 0x3F));
+            out[j++] = (char)c;
+        }
+        else if (c < 0x0800u)
+        {
+            out[j++] = (char)(0xC0u | (c >> 6));
+            out[j++] = (char)(0x80u | (c & 0x3Fu));
         }
         else
         {
-            utf8_buf[j++] = (unsigned char)(0xE0 | (c >> 12));
-            utf8_buf[j++] = (unsigned char)(0x80 | ((c >> 6) & 0x3F));
-            utf8_buf[j++] = (unsigned char)(0x80 | (c & 0x3F));
+            out[j++] = (char)(0xE0u | (c >> 12));
+            out[j++] = (char)(0x80u | ((c >> 6) & 0x3Fu));
+            out[j++] = (char)(0x80u | (c & 0x3Fu));
         }
     }
 
-    int res = (fwrite(utf8_buf, 1, j, stdout) == j);
-    free(utf8_buf);
-    return res;
+    out[j] = '\0';
+    return out;
+}
+
+int str16_print(const char16_t *txt)
+{
+#ifdef _WIN32
+    size_t n;
+    HANDLE console;
+    DWORD written;
+
+    if (!txt)
+        return 0;
+
+    n = str16_length(txt);
+    if (n == 0)
+        return 1;
+
+    console = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (GetFileType(console) != FILE_TYPE_CHAR)
+        return 0;
+
+    return WriteConsoleW(console, txt, (DWORD)n, &written, NULL) ? 1 : 0;
+#else
+    char *utf8;
+    size_t n;
+    int ok;
+
+    utf8 = str16_to_utf8_alloc(txt);
+    if (!utf8)
+        return 0;
+
+    n = strlen(utf8);
+    ok = fwrite(utf8, 1, n, stdout) == n;
+    free(utf8);
+    return ok;
 #endif
 }
 
 int str16_println(const char16_t *txt)
 {
-    int res = str16_print(txt);
-    str16_print(u"\n");
-    return res;
+    int ok = str16_print(txt);
+    return str16_print(u"\n") && ok;
 }
-
-// int str16_scan(char16_t *out, size_t max_len)
-// {
-//     if (max_len == 0 || out == NULL)
-//         return 0;
-
-//     size_t i = 0;
-//     uint16_t c;
-
-//     while (i < max_len - 1)
-//     {
-//         if (!char16_read(stdin, &c))
-//             break;
-
-//         if (c == u'\r')
-//             continue;
-
-//         if (c == u'\n')
-//             break;
-
-//         out[i] = (char16_t)c;
-//         i++;
-//     }
-//     out[i] = 0;
-
-//     return (i > 0 || !feof(stdin)) ? 1 : 0;
-// }
 
 int str16_scanline(char16_t *buffer, size_t max_len)
 {
@@ -383,110 +492,98 @@ int str16_scanline(char16_t *buffer, size_t max_len)
         return 0;
 
 #ifdef _WIN32
-    HANDLE hConsole = GetStdHandle(STD_INPUT_HANDLE);
-    if (GetFileType(hConsole) == FILE_TYPE_CHAR)
-    {
-        DWORD read;
-        // Lê diretamente do console limitando o tamanho
-        if (ReadConsoleW(hConsole, buffer, (DWORD)max_len - 1, &read, NULL))
-        {
-            // Limpeza de CR LF (\r\n) do Windows
-            while (read > 0 && (buffer[read - 1] == u'\n' || buffer[read - 1] == u'\r'))
-            {
-                read--;
-            }
-            buffer[read] = u'\0';
-            return 1;
-        }
-    }
-    return 0;
-#else
-    /* Modo POSIX: Lê UTF-8 do stdin e decodifica para char16_t */
-    char utf8_buf[2048]; // Buffer temporário para a linha em UTF-8
-    if (!fgets(utf8_buf, sizeof(utf8_buf), stdin))
+    HANDLE console = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD read;
+
+    if (GetFileType(console) != FILE_TYPE_CHAR)
         return 0;
 
-    size_t i = 0, j = 0;
-    while (utf8_buf[i] && utf8_buf[i] != '\n' && utf8_buf[i] != '\r' && j < max_len - 1)
-    {
-        unsigned char c = (unsigned char)utf8_buf[i];
+    if (!ReadConsoleW(console, buffer, (DWORD)max_len - 1, &read, NULL))
+        return 0;
 
-        if (c < 0x80)
-        { // 1 Byte (0xxxxxxx)
-            buffer[j++] = c;
+    while (read > 0 && (buffer[read - 1] == u'\n' || buffer[read - 1] == u'\r'))
+        read--;
+
+    buffer[read] = 0;
+    return 1;
+#else
+    char utf8[2048];
+    size_t len;
+    size_t i = 0;
+    size_t j = 0;
+
+    if (!fgets(utf8, sizeof(utf8), stdin))
+        return 0;
+
+    len = strlen(utf8);
+    while (i < len && utf8[i] != '\n' && utf8[i] != '\r' && j < max_len - 1)
+    {
+        unsigned char c = (unsigned char)utf8[i];
+
+        if (c < 0x80u)
+        {
+            buffer[j++] = (char16_t)c;
             i++;
         }
-        else if ((c & 0xE0) == 0xC0)
-        { // 2 Bytes (110xxxxx 10xxxxxx)
-            buffer[j++] = (char16_t)(((c & 0x1F) << 6) | (utf8_buf[i + 1] & 0x3F));
+        else if ((c & 0xE0u) == 0xC0u && i + 1 < len &&
+                 str16_utf8_cont((unsigned char)utf8[i + 1]))
+        {
+            uint16_t cp = (uint16_t)(((c & 0x1Fu) << 6) |
+                                    ((unsigned char)utf8[i + 1] & 0x3Fu));
+            if (cp >= 0x80u)
+                buffer[j++] = (char16_t)cp;
             i += 2;
         }
-        else if ((c & 0xF0) == 0xE0)
-        { // 3 Bytes (1110xxxx 10xxxxxx 10xxxxxx)
-            buffer[j++] = (char16_t)(((c & 0x0F) << 12) |
-                                     ((utf8_buf[i + 1] & 0x3F) << 6) |
-                                     (utf8_buf[i + 2] & 0x3F));
+        else if ((c & 0xF0u) == 0xE0u && i + 2 < len &&
+                 str16_utf8_cont((unsigned char)utf8[i + 1]) &&
+                 str16_utf8_cont((unsigned char)utf8[i + 2]))
+        {
+            uint16_t cp = (uint16_t)(((c & 0x0Fu) << 12) |
+                                    (((unsigned char)utf8[i + 1] & 0x3Fu) << 6) |
+                                    ((unsigned char)utf8[i + 2] & 0x3Fu));
+            if (cp >= 0x0800u && !str16_is_surrogate(cp))
+                buffer[j++] = (char16_t)cp;
             i += 3;
         }
+        else if ((c & 0xF8u) == 0xF0u && i + 3 < len &&
+                 str16_utf8_cont((unsigned char)utf8[i + 1]) &&
+                 str16_utf8_cont((unsigned char)utf8[i + 2]) &&
+                 str16_utf8_cont((unsigned char)utf8[i + 3]))
+        {
+            /* Fora do BMP por decisão de projeto. */
+            i += 4;
+        }
         else
         {
-            i++; // Ignora caracteres inválidos ou fora do plano multilíngue básico (BMP)
+            i++;
         }
     }
-    buffer[j] = u'\0';
+
+    buffer[j] = 0;
     return 1;
 #endif
-}
-
-/* Converte a sua string UTF-16 para o padrão C char UTF-8.
-   O chamador deve dar free() no ponteiro retornado. */
-char *str16_to_utf8_alloc(const char16_t *txt)
-{
-    if (!txt)
-        return NULL;
-    size_t len = str16_length(txt);
-
-    // Pior cenário: Cada caractere 16-bits vira 3 bytes UTF-8 + terminador nulo
-    char *utf8_out = malloc((len * 3) + 1);
-    if (!utf8_out)
-        return NULL;
-
-    size_t j = 0;
-    for (size_t i = 0; i < len; i++)
-    {
-        uint16_t c = txt[i];
-        if (c < 0x0080)
-        {
-            utf8_out[j++] = (char)c;
-        }
-        else if (c < 0x0800)
-        {
-            utf8_out[j++] = (char)(0xC0 | (c >> 6));
-            utf8_out[j++] = (char)(0x80 | (c & 0x3F));
-        }
-        else
-        {
-            utf8_out[j++] = (char)(0xE0 | (c >> 12));
-            utf8_out[j++] = (char)(0x80 | ((c >> 6) & 0x3F));
-            utf8_out[j++] = (char)(0x80 | (c & 0x3F));
-        }
-    }
-    utf8_out[j] = '\0';
-
-    return utf8_out;
 }
 
 long int str16_forLong(const char16_t *string, char16_t **end, int base)
 {
     const char16_t *str = string;
+    const char16_t *digits_start;
     unsigned long acc = 0;
+    unsigned long cutoff;
+    unsigned long cutlim;
+    unsigned long ubase;
     int sign = 1;
     int overflow = 0;
 
-    while (*str == u' ' || *str == u'\t' || *str == u'\n' || *str == u'\r')
-        str++;
+    if (!string)
+    {
+        if (end)
+            *end = NULL;
+        return 0;
+    }
 
-    const char16_t *save = str;
+    while (str16_is_space(*str))
+        str++;
 
     if (*str == u'-')
     {
@@ -494,72 +591,68 @@ long int str16_forLong(const char16_t *string, char16_t **end, int base)
         str++;
     }
     else if (*str == u'+')
+    {
         str++;
+    }
 
     if (base < 0 || base == 1 || base > 36)
     {
-        if (end != NULL)
+        if (end)
             *end = (char16_t *)string;
-
         return 0;
     }
 
-    if (base == 0 || base == 16)
+    if ((base == 0 || base == 16) && *str == u'0' && (str[1] == u'x' || str[1] == u'X'))
     {
-        if (*str == u'0' && (*(str + 1) == u'x' || *(str + 1) == u'X'))
-        {
-            base = 16;
-            str += 2;
-        }
+        base = 16;
+        str += 2;
     }
+
     if (base == 0)
-    {
-        if (*str == u'0')
-            base = 8;
+        base = *str == u'0' ? 8 : 10;
 
-        else
-            base = 10;
-    }
-
-    const char16_t *digits_start = str;
-
-    unsigned long cutoff = (sign > 0) ? LONG_MAX : (unsigned long)LONG_MAX + 1;
-    unsigned long cutlim = cutoff % base;
-    cutoff /= base;
+    ubase = (unsigned long)base;
+    digits_start = str;
+    cutoff = sign > 0 ? (unsigned long)LONG_MAX : (unsigned long)LONG_MAX + 1ul;
+    cutlim = cutoff % ubase;
+    cutoff /= ubase;
 
     while (*str)
     {
-        int c = *str;
         int val;
+        char16_t c = *str;
 
         if (c >= u'0' && c <= u'9')
-            val = c - u'0';
+            val = (int)(c - u'0');
         else if (c >= u'a' && c <= u'z')
-            val = c - u'a' + 10;
+            val = (int)(c - u'a') + 10;
         else if (c >= u'A' && c <= u'Z')
-            val = c - u'A' + 10;
+            val = (int)(c - u'A') + 10;
         else
             break;
 
-        if (val >= base)
+        if ((unsigned int)val >= (unsigned int)base)
             break;
 
         if (overflow || acc > cutoff || (acc == cutoff && (unsigned long)val > cutlim))
             overflow = 1;
-
         else
-            acc = (acc * base) + val;
+            acc = acc * ubase + (unsigned long)val;
 
         str++;
     }
 
-    if (end != NULL)
+    if (end)
         *end = (char16_t *)(str == digits_start ? string : str);
 
     if (overflow)
-        return (sign > 0) ? LONG_MAX : LONG_MIN;
+        return sign > 0 ? LONG_MAX : LONG_MIN;
 
-    return (long)(sign > 0 ? acc : -acc);
+    if (sign > 0)
+        return (long)acc;
+    if (acc == (unsigned long)LONG_MAX + 1ul)
+        return LONG_MIN;
+    return -(long)acc;
 }
 
 double str16_forDouble(const char16_t *string, char16_t **end)
@@ -567,8 +660,16 @@ double str16_forDouble(const char16_t *string, char16_t **end)
     const char16_t *str = string;
     double acc = 0.0;
     int sign = 1;
+    int has_digits = 0;
 
-    while (*str == u' ' || *str == u'\t' || *str == u'\n' || *str == u'\r')
+    if (!string)
+    {
+        if (end)
+            *end = NULL;
+        return 0.0;
+    }
+
+    while (str16_is_space(*str))
         str++;
 
     if (*str == u'-')
@@ -577,39 +678,41 @@ double str16_forDouble(const char16_t *string, char16_t **end)
         str++;
     }
     else if (*str == u'+')
-        str++;
-
-    if ((*str == u'I' || *str == u'i') && (*(str + 1) == u'N' || *(str + 1) == u'n') && (*(str + 2) == u'F' || *(str + 2) == u'f'))
     {
-        str += 3;
-
-        if ((*str == u'I' || *str == u'i') && (*(str + 1) == u'N' || *(str + 1) == u'n') && (*(str + 4) == u'Y' || *(str + 4) == u'y'))
-            while ((*str >= u'a' && *str <= u'z') || (*str >= u'A' && *str <= u'Z'))
-                str++;
-
-        if (end != NULL)
-            *end = (char16_t *)str;
-
-        return sign > 0 ? (1e300 * 1e300) : -(1e300 * 1e300);
+        str++;
     }
 
-    int has_digits = 0;
+    if (str16_prefix_icase(str, "infinity"))
+    {
+        str += 8;
+        if (end)
+            *end = (char16_t *)str;
+        return sign > 0 ? HUGE_VAL : -HUGE_VAL;
+    }
+
+    if (str16_prefix_icase(str, "inf"))
+    {
+        str += 3;
+        if (end)
+            *end = (char16_t *)str;
+        return sign > 0 ? HUGE_VAL : -HUGE_VAL;
+    }
 
     while (*str >= u'0' && *str <= u'9')
     {
-        acc = (acc * 10.0) + (*str - u'0');
+        acc = acc * 10.0 + (double)(*str - u'0');
         has_digits = 1;
         str++;
     }
 
     if (*str == u'.' || *str == u',')
     {
-        str++;
         double power = 1.0;
+        str++;
 
         while (*str >= u'0' && *str <= u'9')
         {
-            acc = (acc * 10.0) + (*str - u'0');
+            acc = acc * 10.0 + (double)(*str - u'0');
             power *= 10.0;
             has_digits = 1;
             str++;
@@ -620,118 +723,127 @@ double str16_forDouble(const char16_t *string, char16_t **end)
 
     if (has_digits && (*str == u'e' || *str == u'E'))
     {
-        const char16_t *save_e = str;
-        str++;
-
+        const char16_t *save_e = str++;
         int exp_sign = 1;
+        int exp_val = 0;
+        int has_exp = 0;
+
         if (*str == u'-')
         {
             exp_sign = -1;
             str++;
         }
         else if (*str == u'+')
+        {
             str++;
-
-        int exp_val = 0;
-        int has_exp_digits = 0;
+        }
 
         while (*str >= u'0' && *str <= u'9')
         {
             if (exp_val < 10000)
-                exp_val = (exp_val * 10) + (*str - u'0');
-
-            has_exp_digits = 1;
+                exp_val = exp_val * 10 + (int)(*str - u'0');
+            has_exp = 1;
             str++;
         }
 
-        if (has_exp_digits)
+        if (has_exp)
         {
-            double exp_mult = 1.0;
+            double factor = 1.0;
             double base_mult = 10.0;
-            int e = exp_val;
+            int exp = exp_val;
 
-            while (e > 0)
+            while (exp > 0)
             {
-                if (e % 2 == 1)
-                    exp_mult *= base_mult;
-
+                if (exp % 2 != 0)
+                    factor *= base_mult;
                 base_mult *= base_mult;
-                e /= 2;
+                exp /= 2;
             }
 
             if (exp_sign < 0)
-                acc /= exp_mult;
-
+                acc /= factor;
             else
-                acc *= exp_mult;
+                acc *= factor;
         }
         else
+        {
             str = save_e;
+        }
     }
 
-    if (end != NULL)
+    if (end)
         *end = (char16_t *)(has_digits ? str : string);
 
-    return acc * sign;
+    return acc * (double)sign;
 }
 
-char16_t *str16_fromLong(long value, char16_t *buffer, int base)
+char16_t *str16_fromLong_n(long value, char16_t *buffer, size_t max_len, int base)
 {
-    if (base < 2 || base > 36)
-    {
-        buffer[0] = 0;
-        return NULL;
-    }
-
-    size_t i = 0;
-    int isNegative = 0;
+    char16_t tmp[sizeof(unsigned long) * CHAR_BIT + 2];
     unsigned long n;
+    size_t used = 0;
+    int negative = value < 0 && base == 10;
 
-    if (value < 0 && base == 10)
-    {
-        isNegative = 1;
-        n = (unsigned long)(-(value + 1)) + 1;
-    }
+    if (!buffer || max_len == 0 || base < 2 || base > 36)
+        return NULL;
+
+    if (negative)
+        n = (unsigned long)(-(value + 1)) + 1ul;
     else
         n = (unsigned long)value;
 
     do
     {
-        int rem = n % base;
-        buffer[i++] = (rem > 9) ? (char16_t)((rem - 10) + u'a') : (char16_t)(rem + u'0');
-        n = n / base;
+        unsigned long rem = n % (unsigned long)base;
+        tmp[used++] = rem > 9ul ? (char16_t)(u'a' + rem - 10ul) : (char16_t)(u'0' + rem);
+        n /= (unsigned long)base;
     } while (n != 0);
 
-    if (isNegative)
-        buffer[i++] = u'-';
+    if (negative)
+        tmp[used++] = u'-';
 
-    buffer[i] = 0;
-    str16_reverse(buffer);
+    if (used + 1 > max_len)
+    {
+        buffer[0] = 0;
+        return NULL;
+    }
 
+    for (size_t i = 0; i < used; i++)
+        buffer[i] = tmp[used - i - 1];
+
+    buffer[used] = 0;
     return buffer;
+}
+
+char16_t *str16_fromLong(long value, char16_t *buffer, int base)
+{
+    return str16_fromLong_n(value, buffer, sizeof(unsigned long) * CHAR_BIT + 2, base);
 }
 
 char16_t *str16_fromDouble(double value, int precision, char16_t *buffer, size_t max_len)
 {
-    if (!buffer || max_len == 0)
+    char *tmp;
+    int len;
+
+    if (!buffer || max_len == 0 || precision < 0)
         return NULL;
 
-    char temp_ascii[64];
-
-    int len = snprintf(temp_ascii, sizeof(temp_ascii), "%.*f", precision, value);
-
-    if (len < 0 ||
-        (size_t)len >= sizeof(temp_ascii) ||
-        (size_t)len >= max_len)
+    tmp = malloc(max_len);
+    if (!tmp)
         return NULL;
 
-    if ((size_t)len >= max_len)
-        len = max_len - 1;
+    len = snprintf(tmp, max_len, "%.*f", precision, value);
+    if (len < 0 || (size_t)len >= max_len)
+    {
+        buffer[0] = 0;
+        free(tmp);
+        return NULL;
+    }
 
-    for (int i = 0; i < len; i++)
-        buffer[i] = (char16_t)temp_ascii[i];
+    for (size_t i = 0; i < (size_t)len; i++)
+        buffer[i] = (char16_t)(unsigned char)tmp[i];
 
     buffer[len] = 0;
-
+    free(tmp);
     return buffer;
 }
