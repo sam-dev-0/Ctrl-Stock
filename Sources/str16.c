@@ -714,14 +714,16 @@ char16_t *str16_fromLong(long value, char16_t *buffer, int base)
 char16_t *str16_fromDouble(double value, int precision, char16_t *buffer, size_t max_len)
 {
     if (!buffer || max_len == 0)
-        return 0;
+        return NULL;
 
     char temp_ascii[64];
 
     int len = snprintf(temp_ascii, sizeof(temp_ascii), "%.*f", precision, value);
 
-    if (len < 0)
-        return 0;
+    if (len < 0 ||
+        (size_t)len >= sizeof(temp_ascii) ||
+        (size_t)len >= max_len)
+        return NULL;
 
     if ((size_t)len >= max_len)
         len = max_len - 1;
