@@ -81,9 +81,7 @@ static int csv16_value_valid(const char16_t *value)
     return 1;
 }
 
-static int csv16_schema_valid(const char16_t *filename, char16_t delim,
-                              uint16_t columns, const uint16_t *sizes,
-                              const char16_t *const *labels)
+static int csv16_schema_valid(const char16_t *filename, char16_t delim, uint16_t columns, const uint16_t *sizes, const char16_t *const *labels)
 {
     size_t row_size = 0;
 
@@ -111,16 +109,11 @@ static int csv16_schema_valid(const char16_t *filename, char16_t delim,
     return 1;
 }
 
-static Header *csv16_new_header(const char *filename_str,
-                                const char16_t *filename_utf16,
-                                char16_t delimiter, uint16_t totalcolumns,
-                                const uint16_t *sizecolumn,
-                                const char16_t *const *labels)
+static Header *csv16_new_header(const char *filename_str, const char16_t *filename_utf16, char16_t delimiter, uint16_t totalcolumns, const uint16_t *sizecolumn, const char16_t *const *labels)
 {
     Header *header;
 
-    if (!filename_str || !csv16_schema_valid(filename_utf16, delimiter,
-                                              totalcolumns, sizecolumn, labels))
+    if (!filename_str || !csv16_schema_valid(filename_utf16, delimiter, totalcolumns, sizecolumn, labels))
         return NULL;
 
     header = calloc(1, sizeof(*header));
@@ -158,8 +151,7 @@ static Header *csv16_new_header(const char *filename_str,
 
         if (i > 0)
         {
-            header->offsetcolumn[i] = (uint16_t)(header->offsetcolumn[i - 1] +
-                                                 header->sizecolumn[i - 1] + 1u);
+            header->offsetcolumn[i] = (uint16_t)(header->offsetcolumn[i - 1] + header->sizecolumn[i - 1] + 1u);
         }
     }
 
@@ -223,15 +215,12 @@ static int csv16_meta_line(const Header *header, char16_t line[LINE_TOTAL])
     return str16_length(line) <= LINE_CONTENT;
 }
 
-Header *csv16_create(const char *filename_str, const char16_t *filename_utf16,
-                     char16_t delimiter, uint16_t totalcolumns,
-                     const uint16_t *sizecolumn, const char16_t *const *labels)
+Header *csv16_create(const char *filename_str, const char16_t *filename_utf16, char16_t delimiter, uint16_t totalcolumns, const uint16_t *sizecolumn, const char16_t *const *labels)
 {
     Header *header;
     char16_t line[LINE_TOTAL];
 
-    header = csv16_new_header(filename_str, filename_utf16, delimiter,
-                              totalcolumns, sizecolumn, labels);
+    header = csv16_new_header(filename_str, filename_utf16, delimiter, totalcolumns, sizecolumn, labels);
     if (!header)
         return NULL;
 
@@ -290,8 +279,7 @@ static char16_t *csv16_token(char16_t *string, char16_t delim, char16_t **save)
     return start;
 }
 
-static size_t csv16_split(char16_t *line, char16_t delim,
-                          char16_t **out, size_t max_tokens)
+static size_t csv16_split(char16_t *line, char16_t delim, char16_t **out, size_t max_tokens)
 {
     char16_t *save = NULL;
     char16_t *token;
@@ -410,8 +398,7 @@ static int csv16_row_valid(const Header *header, const char16_t row[LINE_TOTAL])
     return 1;
 }
 
-Header *csv16_open(const char *filename_str, const char16_t *filename_utf16,
-                   char16_t delimiter)
+Header *csv16_open(const char *filename_str, const char16_t *filename_utf16, char16_t delimiter)
 {
     FILE *file;
     Header *header = NULL;
@@ -468,8 +455,7 @@ Header *csv16_open(const char *filename_str, const char16_t *filename_utf16,
         labels[i] = part[0];
     }
 
-    header = csv16_new_header(filename_str, filename_utf16, delimiter,
-                              columns, sizes, labels);
+    header = csv16_new_header(filename_str, filename_utf16, delimiter, columns, sizes, labels);
     if (!header)
         goto fail;
 
@@ -515,8 +501,7 @@ static int csv16_get_col(const Header *header, const char16_t *label)
     return -1;
 }
 
-static int csv16_get_field(const Header *header, const char16_t *row,
-                           uint16_t column, char16_t out[LINE_TOTAL])
+static int csv16_get_field(const Header *header, const char16_t *row, uint16_t column, char16_t out[LINE_TOTAL])
 {
     uint16_t width;
     uint16_t offset;
@@ -535,8 +520,7 @@ static int csv16_get_field(const Header *header, const char16_t *row,
     return 1;
 }
 
-static int csv16_set_field(const Header *header, char16_t *row,
-                           uint16_t column, const char16_t *value)
+static int csv16_set_field(const Header *header, char16_t *row, uint16_t column, const char16_t *value)
 {
     if (!header || !row || !value || column >= header->totalcolumns)
         return 0;
@@ -544,12 +528,10 @@ static int csv16_set_field(const Header *header, char16_t *row,
     if (!csv16_value_valid(value))
         return 0;
 
-    return str16_pack(value, row + header->offsetcolumn[column],
-                      header->sizecolumn[column]);
+    return str16_pack(value, row + header->offsetcolumn[column], header->sizecolumn[column]);
 }
 
-static int csv16_make_row(const Header *header, const char16_t *const *values,
-                          char16_t row[LINE_TOTAL])
+static int csv16_make_row(const Header *header, const char16_t *const *values, char16_t row[LINE_TOTAL])
 {
     if (!header || !values || !row)
         return 0;
@@ -599,8 +581,7 @@ void csv16_free_changes(Changes *changes)
     }
 }
 
-static int csv16_apply_changes(const Header *header, const Changes *changes,
-                               int64_t row, char16_t row_line[LINE_TOTAL])
+static int csv16_apply_changes(const Header *header, const Changes *changes, int64_t row, char16_t row_line[LINE_TOTAL])
 {
     for (const Changes *curr = changes; curr; curr = curr->next)
     {
@@ -621,8 +602,7 @@ static int csv16_apply_changes(const Header *header, const Changes *changes,
     return 1;
 }
 
-static int64_t csv16_find_disk(const Header *header, const Changes *changes,
-                               uint16_t where_col, const char16_t *where_value)
+static int64_t csv16_find_disk(const Header *header, const Changes *changes, uint16_t where_col, const char16_t *where_value)
 {
     FILE *file;
     char16_t row_line[LINE_TOTAL];
@@ -659,8 +639,7 @@ static int64_t csv16_find_disk(const Header *header, const Changes *changes,
     return -1;
 }
 
-static Changes *csv16_find_insert(const Header *header, Changes *changes,
-                                  uint16_t where_col, const char16_t *where_value)
+static Changes *csv16_find_insert(const Header *header, Changes *changes, uint16_t where_col, const char16_t *where_value)
 {
     char16_t field[LINE_TOTAL];
 
@@ -711,8 +690,7 @@ static Changes *csv16_remove_node(Changes *head, Changes *target)
     return head;
 }
 
-char16_t *csv16_read(Header *header, const char16_t *target_label,
-                     const char16_t *where_label, const char16_t *where_value)
+char16_t *csv16_read(Header *header, const char16_t *target_label, const char16_t *where_label, const char16_t *where_value)
 {
     FILE *file;
     char16_t row_line[LINE_TOTAL];
@@ -772,12 +750,7 @@ int csv16_foreach(Header *header, Csv16Visitante visitante, void *contexto)
         size_t total_unidades;
         size_t bytes_armazenamento;
 
-        if (!csv16_mul_size((size_t)header->totalcolumns, sizeof(*valores),
-                            &bytes_valores) ||
-            !csv16_mul_size((size_t)header->totalcolumns, LINE_TOTAL,
-                            &total_unidades) ||
-            !csv16_mul_size(total_unidades, sizeof(*armazenamento),
-                            &bytes_armazenamento))
+        if (!csv16_mul_size((size_t)header->totalcolumns, sizeof(*valores), &bytes_valores) || !csv16_mul_size((size_t)header->totalcolumns, LINE_TOTAL, &total_unidades) || !csv16_mul_size(total_unidades, sizeof(*armazenamento), &bytes_armazenamento))
         {
             return 0;
         }
@@ -832,8 +805,7 @@ int csv16_foreach(Header *header, Csv16Visitante visitante, void *contexto)
                 }
             }
 
-            if (!ok || !visitante(linha, (const char16_t *const *)valores,
-                                   header->totalcolumns, contexto))
+            if (!ok || !visitante(linha, (const char16_t *const *)valores, header->totalcolumns, contexto))
             {
                 ok = 0;
                 break;
@@ -877,9 +849,7 @@ Changes *csv16_insert(Header *header, Changes *changes, const char16_t *const *v
     return csv16_append(changes, node);
 }
 
-Changes *csv16_update(Header *header, Changes *changes,
-                      const char16_t *target_label, const char16_t *new_value,
-                      const char16_t *where_label, const char16_t *where_value)
+Changes *csv16_update(Header *header, Changes *changes, const char16_t *target_label, const char16_t *new_value, const char16_t *where_label, const char16_t *where_value)
 {
     Changes *node;
     Changes *insert;
@@ -934,8 +904,7 @@ Changes *csv16_update(Header *header, Changes *changes,
     return csv16_append(changes, node);
 }
 
-Changes *csv16_delete(Header *header, Changes *changes,
-                      const char16_t *where_label, const char16_t *where_value)
+Changes *csv16_delete(Header *header, Changes *changes, const char16_t *where_label, const char16_t *where_value)
 {
     Changes *insert;
     Changes *node;
@@ -1031,8 +1000,7 @@ static int csv16_save_delete(Header *header, FILE *file, long offset, int64_t ro
     return csv16_write_at(file, offset, blank, LINE_TOTAL) && csv16_add_blank(header, row);
 }
 
-static int csv16_save_update(const Header *header, FILE *file, long offset,
-                             const Changes *change)
+static int csv16_save_update(const Header *header, FILE *file, long offset, const Changes *change)
 {
     char16_t field[LINE_CONTENT];
     uint16_t width;

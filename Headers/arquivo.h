@@ -28,9 +28,7 @@ typedef enum ArquivoStatus
  * A gravação ocorre primeiro em arquivos temporários. Os arquivos principais
  * somente são substituídos depois que as duas tabelas temporárias são salvas.
  */
-ArquivoStatus arquivo_salvar_estoque(const Estoque *estoque,
-                                     const char *arquivo_produtos,
-                                     const char *arquivo_estoque);
+ArquivoStatus arquivo_salvar_estoque(const Estoque *estoque, const char *arquivo_produtos, const char *arquivo_estoque);
 
 /*
  * Carrega os dois arquivos em um Estoque temporário. O objeto de destino só é
@@ -39,9 +37,7 @@ ArquivoStatus arquivo_salvar_estoque(const Estoque *estoque,
  *
  * Pré-condição: estoque deve ter sido inicializado com estoque_init().
  */
-ArquivoStatus arquivo_carregar_estoque(Estoque *estoque,
-                                       const char *arquivo_produtos,
-                                       const char *arquivo_estoque);
+ArquivoStatus arquivo_carregar_estoque(Estoque *estoque, const char *arquivo_produtos, const char *arquivo_estoque);
 
 const char *arquivo_status_texto(ArquivoStatus status);
 

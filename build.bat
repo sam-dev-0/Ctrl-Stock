@@ -1,8 +1,17 @@
 @echo off
 setlocal
+cd /d "%~dp0"
 
 gcc -std=c11 -Wall -Wextra -Wpedantic -O2 ^
-  main.c produto.c estoque.c arquivo.c arq16_csv.c arq16.c str16.c tui16.c ^
+  -IHeaders ^
+  main.c ^
+  Sources\produto.c ^
+  Sources\estoque.c ^
+  Sources\arquivo.c ^
+  Sources\arq16_csv.c ^
+  Sources\arq16.c ^
+  Sources\str16.c ^
+  Sources\tui16.c ^
   -o estoque.exe
 
 if errorlevel 1 (

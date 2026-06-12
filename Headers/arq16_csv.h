@@ -46,10 +46,7 @@ char16_t *csv16_read(Header *header, const char16_t *target_label, const char16_
  * Os ponteiros em valores são válidos apenas durante a chamada do visitante.
  * Retorne zero no visitante para interromper a iteração com falha.
  */
-typedef int (*Csv16Visitante)(int64_t linha,
-                              const char16_t *const *valores,
-                              uint16_t total_colunas,
-                              void *contexto);
+typedef int (*Csv16Visitante)(int64_t linha, const char16_t *const *valores, uint16_t total_colunas, void *contexto);
 
 int csv16_foreach(Header *header, Csv16Visitante visitante, void *contexto);
 

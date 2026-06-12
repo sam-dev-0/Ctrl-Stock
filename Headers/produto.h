@@ -28,13 +28,7 @@ typedef struct Produto
  * Inicializa um produto somente quando todos os dados são válidos.
  * Em caso de erro, o objeto apontado por produto não é alterado.
  */
-bool produto_init(Produto *produto,
-                  uint32_t id,
-                  const char16_t *codbar,
-                  const char16_t *nome,
-                  double preco,
-                  uint32_t quantidade,
-                  const char16_t *categoria);
+bool produto_init(Produto *produto, uint32_t id, const char16_t *codbar, const char16_t *nome, double preco, uint32_t quantidade, const char16_t *categoria);
 
 /* Valida integralmente um produto já existente. */
 bool produto_validar(const Produto *produto);
