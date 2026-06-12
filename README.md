@@ -2,6 +2,19 @@
 
 Aplicação TUI para Windows escrita em C. O sistema cadastra produtos, controla vendas, gera relatórios e salva os dados em arquivos UTF-16LE de largura fixa.
 
+## Criadores
+
+- Rai Charles Ramos
+- Ellen Leticia Correia
+- Gabriela Dias
+- Giovanna Borba
+- João Arthur
+- Matheus Reis
+- Nathan Victor
+- Samuel Lopes
+
+### UNASP - CENTRO ADVENTISTA DE SÃO PAULO
+
 ## Arquitetura
 
 | Módulo | Responsabilidade |
